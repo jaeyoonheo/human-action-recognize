@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 
-WINDOW_SIZE = 32  # 32 continuous frames
+WINDOW_SIZE = 9  # 32 continuous frames
 
 
 class PoseDataset(Dataset):
@@ -35,13 +35,9 @@ class PoseDataModule(pl.LightningDataModule):
         self.y_test_path = self.data_root + "Y_test.txt"
 
 
-    # Detectron2 produces only 17 key points while OpenPose produces 18 (or more) key points.
     def convert_to_detectron_format(self, row):
-        row = row.split(',')
-        # filtering out coordinate of neck joint from the training/validation set originally generated using OpenPose.
-        temp = row[:2] + row[4:]
+        temp = row.split(',')
         # change to Detectron2 order of key points
-        temp = [temp[i] for i in openpose_to_detectron_mapping]
         return temp
 
     def load_X(self, X_path):
@@ -54,9 +50,16 @@ class PoseDataModule(pl.LightningDataModule):
         )
         file.close()
         blocks = int(len(X) / WINDOW_SIZE)
-        X_ = np.array(np.split(X, blocks))
+        # split을 하는 것보다 원하는 데이터셋을 여기서 만들어주자
+        X_ = []
+        for i in range(0,len(X)-WINDOW_SIZE):
+            _x = X[i:i+WINDOW_SIZE,]
+            X_.append(_x)
+        # error occured
+        X_ = np.array(X_)
+        print(len(X_))
+        # X_ = np.array(np.split(X, blocks))
         return X_
-
     # Load the networks outputs
     def load_y(self, y_path):
         file = open(y_path, 'r')
@@ -100,7 +103,7 @@ class PoseDataModule(pl.LightningDataModule):
         return val_loader
 
 # We have 6 output action classes.
-TOT_ACTION_CLASSES = 6
+TOT_ACTION_CLASSES = 2
 
 #lstm classifier definition
 class ActionClassificationLSTM(pl.LightningModule):
